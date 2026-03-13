@@ -60,22 +60,32 @@ const NavItem = ({ icon, label, id, activeTab, setActiveTab }) => (
 );
 
 export default function App() {
-  // --- AUTH STATES ---
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isRegister, setIsRegister] = useState(false);
+// --- AUTH STATES ---
+const [isLoggedIn, setIsLoggedIn] = useState(false);
+const [isRegister, setIsRegister] = useState(false);
+const [adminCode, setAdminCode] = useState("");
+
+const [loginData, setLoginData] = useState({ 
+  name: '', 
+  email: '', 
+  whatsapp: '', 
+  role: 'member' 
+});
 
 const [users, setUsers] = useState(() => {
   const saved = localStorage.getItem("users");
   return saved ? JSON.parse(saved) : [];
 });
 
+const [currentUserId, setCurrentUserId] = useState(null);
+const [role, setRole] = useState('member'); 
+
 // --- USE EFFECT ---
 useEffect(() => {
   localStorage.setItem("users", JSON.stringify(users));
 }, [users]);
 
-const [adminCode, setAdminCode] = useState("");
-  const [loginData, setLoginData] = useState({ name: '', email: '', whatsapp: '', role: 'member' });
+
 const handleRegister = (e) => {
   e.preventDefault();
 
@@ -84,37 +94,47 @@ const handleRegister = (e) => {
     return;
   }
 
-  const userExists = users.find((u) => u.email === loginData.email);
+const userExists = users.find((u) => u.email === loginData.email);
 
   if (userExists) {
     alert("Email sudah terdaftar");
     return;
   }
 
-  const newUser = {
-    id: Date.now(),
-    ...loginData
-  };
+const newUser = {
+  id: Date.now(),
+  name: loginData.name,
+  email: loginData.email,
+  whatsapp: loginData.whatsapp,
+  role: loginData.role,
+  photo: "",
+  address: "",
+  birthPlace: "",
+  birthDate: "",
+  hobby: "",
+  motivation: ""
+};
 
   setUsers([...users, newUser]);
-
   alert("Pendaftaran berhasil, silakan login");
-
   setIsRegister(false);
 };
 
-  // --- APP STATES ---
-  const [role, setRole] = useState('member'); 
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [books, setBooks] = useState(INITIAL_BOOKS);
-  const members = users.filter(user => user.role === "member");
-  // HAPUS MEMBER
-const deleteMember = (id) => {
-  if (window.confirm("Hapus member ini?")) {
-    const updatedUsers = users.filter((u) => u.id !== id);
-    setUsers(updatedUsers);
+// --- APP STATES ---
+const [activeTab, setActiveTab] = useState('dashboard');
+const [sidebarOpen, setSidebarOpen] = useState(false);
+const [books, setBooks] = useState(INITIAL_BOOKS);
+const members = users.filter(user => user.role === "member");
+
+
+// HAPUS MEMBER
+  function deleteMember(id) {
+    if (window.confirm("Hapus member ini?")) {
+      const updatedUsers = users.filter((u) => u.id !== id);
+      setUsers(updatedUsers);
+    }
   }
-};
+
 // EDIT MEMBER
 const editMember = (id) => {
   const newEmail = prompt("Masukkan email baru:");
@@ -136,13 +156,18 @@ const editMember = (id) => {
 
   const [selectedBook, setSelectedBook] = useState(null);
   const [profile, setProfile] = useState({
-    name: "",
-    email: "",
-    whatsapp: "",
-    photo: ""
-  });
-  const [currentUserId, setCurrentUserId] = useState(null);
-
+  name: "",
+  email: "",
+  whatsapp: "",
+  photo: "",
+  address: "",
+  birthPlace: "",
+  birthDate: "",
+  hobby: "",
+  motivation: ""
+});
+  
+  const [selectedMemberProfile, setSelectedMemberProfile] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentBookId, setCurrentBookId] = useState(null);
@@ -150,10 +175,21 @@ const editMember = (id) => {
     cover: '', title: '', author: '', publisher: '', 
     year: '', isbn: '', pages: '', desc: '', price: '', tag: ''
   });
-  
   const [coverPreview, setCoverPreview] = useState("");
 
   // --- HANDLERS ---
+  // SIMPAN PROFIL
+  const saveProfile = () => {
+
+    const updatedUsers = users.map((u) =>
+      u.id === currentUserId ? { ...u, ...profile } : u
+    );
+
+    setUsers(updatedUsers);
+
+    alert("Profil berhasil disimpan");
+
+  };
   const handleLoginChange = (e) => setLoginData({ ...loginData, [e.target.name]: e.target.value });
   
   const handleCoverUpload = (e) => {
@@ -183,10 +219,10 @@ const editMember = (id) => {
   }
 
     setCurrentUserId(foundUser.id);
-    setRole(loginData.role);
+    setRole(foundUser.role);
     setProfile({
   ...foundUser,
-  photo: `https://ui-avatars.com/api/?name=${foundUser.name.replace(" ", "+")}&background=${foundUser.role === 'admin' ? '4F46E5' : '10B981'}&color=fff`
+  photo: foundUser.photo || `https://ui-avatars.com/api/?name=${foundUser.name.replace(" ", "+")}&background=${foundUser.role === 'admin' ? '4F46E5' : '10B981'}&color=fff`
 });
     setIsLoggedIn(true);
   };
@@ -202,12 +238,27 @@ const editMember = (id) => {
   const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const handleFileUpload = (e, callback) => {
+    // SIMPAN PROFIL MEMBER
     const file = e.target.files[0];
     if (file) {
       const url = URL.createObjectURL(file);
       callback(url);
     }
   };
+
+  // UPLOAD FOTO PROFIL
+    const handleProfilePhoto = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfile({
+          ...profile,
+          photo: reader.result
+        });
+      };
+      reader.readAsDataURL(file);
+    };
 
   const saveBook = (e) => {
     e.preventDefault();
@@ -221,7 +272,7 @@ const editMember = (id) => {
 
   const deleteBook = (id) => { if(window.confirm("Hapus buku?")) setBooks(books.filter(b => b.id !== id)); };
   // TOGGLE RECOMMENDATION
-const toggleRecommendation = (id) => {
+  const toggleRecommendation = (id) => {
   const updatedBooks = books.map((b) =>
     b.id === id ? { ...b, recommended: !b.recommended } : b
   );
@@ -250,51 +301,43 @@ const toggleRecommendation = (id) => {
     b.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
     b.author.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
+// DERIVED DATA
   const totalBookValue = useMemo(() => books.reduce((acc, curr) => acc + (Number(curr.price) || 0), 0), [books]);
 
   const totalBookCount = books.length;
 
 // KELOMPOK BUKU BERDASARKAN TAG (Bookshelf)
 const booksByTag = useMemo(() => {
-
   const grouped = {};
-
   books.forEach((book) => {
-
     const tag = book.tag ? book.tag : "Uncategorized";
-
     if (!grouped[tag]) {
       grouped[tag] = [];
     }
-
     grouped[tag].push(book);
-
   });
-
   return grouped;
-
 }, [books]);
 
 // --- LOGIN VIEW ---
 if (!isLoggedIn) {
   return (
-    <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden border border-gray-100">
-
-        <div className="bg-indigo-600 p-10 text-white text-center">
-          <h1 className="text-3xl font-serif font-bold">
-            Suryakanta<span className="opacity-70">Lib.</span>
-          </h1>
-          <p className="text-indigo-100 text-sm mt-2">
+    <div className="min-h-screen flex items-end justify-center md:justify-end pb-10 p-4 md:p-10 bg-cover bg-center
+      bg-[url('src/Geminiflowership.png')]
+      md:bg-[url('src/Gemini_generated_image.png')]"
+>
+    <div className="bg-white w-[90%] max-w-[220px] sm:max-w-[260px] md:max-w-sm rounded-xl md:rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+      <div className="bg-[#ce5007] p-3 md:p-4 text-[#1A1A1A] text-center">
+        <h1 className="text-xl md:text-3xl font-serif font-bold"> Suryakanta<span className="opacity-90">Lib.</span>
+        </h1>
+          <p className="text-indigo-100 text-xs md:text-sm mt-1">
             Sistem Verifikasi Akses Perpustakaan
           </p>
         </div>
 
         <form
           onSubmit={isRegister ? handleRegister : handleLoginSubmit}
-          className="p-10 space-y-5"
-        >
+          className="p-3 md:p-5 space-y-1">
 
           {/* ROLE SELECT */}
           <div className="flex bg-gray-100 p-1 rounded-2xl mb-4">
@@ -303,7 +346,7 @@ if (!isLoggedIn) {
               onClick={() =>
                 setLoginData({ ...loginData, role: "member" })
               }
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-all ${
+              className={`flex-1 flex items-center justify-center gap-1 py-2 md:py-3 rounded-xl text-xs font-bold transition-all ${
                 loginData.role === "member"
                   ? "bg-white shadow-sm text-indigo-600"
                   : "text-gray-400"
@@ -329,7 +372,7 @@ if (!isLoggedIn) {
 
           {/* NAMA */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">
+            <label className="text-[8px] md:text-[10px] font-bold text-[#1A1A1A] uppercase ml-1 md:ml-2">
               Nama Lengkap
             </label>
             <input
@@ -337,14 +380,14 @@ if (!isLoggedIn) {
               name="name"
               value={loginData.name}
               onChange={handleLoginChange}
-              placeholder="Masukkan nama..."
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+              placeholder="Masukkan nama"
+              className="w-full p-1 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-xs md:text-sm"
             />
           </div>
 
           {/* EMAIL */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">
+            <label className="text-[8px] md:text-[10px] font-bold text-[#1A1A1A] uppercase ml-1 md:ml-2">
               Email Aktif
             </label>
             <input
@@ -353,14 +396,14 @@ if (!isLoggedIn) {
               type="email"
               value={loginData.email}
               onChange={handleLoginChange}
-              placeholder="nama@mail.com"
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+              placeholder="nama@gmail.com"
+              className="w-full p-1 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-xs md:text-sm"
             />
           </div>
 
           {/* WHATSAPP */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">
+            <label className="text-[8px] md:text-[10px] font-bold text-[#1A1A1A] uppercase ml-1 md:ml-2">
               Nomor WhatsApp
             </label>
             <input
@@ -368,15 +411,15 @@ if (!isLoggedIn) {
               name="whatsapp"
               value={loginData.whatsapp}
               onChange={handleLoginChange}
-              placeholder="0812xxxx"
-              className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+              placeholder="08xxxx"
+              className="w-full p-1 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-xs md:text-sm"
             />
           </div>
 
           {/* KODE ADMIN (MUNCUL SAAT REGISTER ADMIN) */}
           {loginData.role === "admin" && isRegister && (
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase ml-2">
+              <label className="text-[6px] md:text-[10px] font-bold text-[#1A1A1A] uppercase ml-1 md:ml-2">
                 Kode Admin
               </label>
               <input
@@ -384,7 +427,7 @@ if (!isLoggedIn) {
                 value={adminCode}
                 onChange={(e) => setAdminCode(e.target.value)}
                 placeholder="Masukkan kode admin"
-                className="w-full p-4 bg-gray-50 rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
+                className="w-full p-1 md:p-4 bg-gray-50 rounded-xl md:rounded-2xl border-none outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-xs md:text-sm"
               />
             </div>
           )}
@@ -392,7 +435,7 @@ if (!isLoggedIn) {
           {/* BUTTON */}
           <button
             type="submit"
-            className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all mt-4 group"
+            className="w-full bg-[#ce5007] text-white py-2.5 md:py-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold flex items-center justify-center gap-2 shadow-xl shadow-indigo-100 hover:bg-[#993a04] transition-all mt-2 md:mt-4 group"
           >
             Masuk Sekarang
             <ArrowRight
@@ -402,7 +445,7 @@ if (!isLoggedIn) {
           </button>
 
           {/* SWITCH LOGIN REGISTER */}
-          <div className="text-center text-sm mt-4">
+          <div className="text-center text-xs md:text-sm mt-3 md:mt-4">
             {isRegister ? "Sudah punya akun?" : "Belum punya akun?"}
 
             <button
@@ -413,18 +456,24 @@ if (!isLoggedIn) {
               {isRegister ? "Login" : "Daftar"}
             </button>
           </div>
-
         </form>
       </div>
     </div>
   );
 }
 
-  // --- MAIN APP VIEW ---
+// --- MAIN APP VIEW ---
   return (
-    <div className="flex min-h-screen bg-[#F5F5F0] text-[#1A1A1A]">
-      {/* SIDEBAR */}
-      <aside className="w-64 bg-white border-r border-gray-100 flex flex-col fixed h-full z-20 shadow-sm">
+    <div className="flex min-h-screen bg-[#fdfdfd] text-[#1A1A1A]">
+      
+    {/* SIDEBAR */}
+    <aside className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-100 flex flex-col z-40 shadow-sm transform transition-transform duration-300
+        ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:flex`}>
+        <button
+        onClick={() => setSidebarOpen(false)}
+        className="md:hidden absolute top-4 right-4 text-gray-500 hover:text-black text-xl">
+        ✕
+      </button>
         <div className="p-8 text-2xl font-serif font-bold text-indigo-600 tracking-tight">
           Suryakanta<span className="text-gray-900">Lib.</span>
         </div>
@@ -446,13 +495,18 @@ if (!isLoggedIn) {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 ml-64 min-h-screen">
+      <main className="flex-1 md:ml-64 min-h-screen">
         <header className="h-20 bg-white/80 backdrop-blur-md sticky top-0 z-10 px-8 flex items-center justify-between border-b border-gray-100">
           <div className="relative w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="md:hidden p-2 mr-3 rounded-xl hover:bg-gray-100 text-xl"
+          >
+            ☰
+          </button>
             <input 
               type="text" placeholder="Cari bukumu..."
-              className="w-full pl-12 pr-4 py-2.5 bg-gray-100 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+              className="w-full pl-4 pr-4 py-2.5 bg-gray-100 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
               value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
@@ -467,14 +521,24 @@ if (!isLoggedIn) {
           </div>
         </header>
 
-        <div className="p-8 max-w-7xl mx-auto">
+        <div className="p-3 md:p-8 max-w-7xl mx-auto">
           
-          {/* TAB: DASHBOARD */}
+          {role === "member" && profile.motivation && (
+          <div className="bg-indigo-50 p-6 rounded-3xl mb-6 border border-indigo-100">
+            <p className="text-xs font-bold text-indigo-500 uppercase mb-1">
+              Motivasi Membaca
+            </p>
+            <p className="text-indigo-900 font-medium italic">
+              "{profile.motivation}"
+            </p>
+          </div>
+        )}
+      {/* TAB: DASHBOARD */}
           {activeTab === 'dashboard' && (
             <>
               <div className="flex justify-between items-center mb-8">
                 <div>
-                  <h1 className="text-3xl font-serif font-bold">Koleksi Buku Suryakanta</h1>
+                  <h1 className="text-xl md:text-3xl font-serif font-bold">Koleksi Buku Suryakanta</h1>
                   <p className="text-gray-500 italic">Temukan bacaan favorit Anda.</p>
                 </div>
                 {role === 'admin' && (
@@ -483,30 +547,30 @@ if (!isLoggedIn) {
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-8">
                 {filteredBooks.map(book => (
-                  <div key={book.id} onClick={() => setSelectedBook(book)} className="bg-white p-4 rounded-[32px] shadow-sm hover:shadow-xl transition-all group border border-transparent hover:border-indigo-100 cursor-pointer">
+                  <div key={book.id} onClick={() => setSelectedBook(book)} className="bg-white p-2 md:p-4 rounded-2xl md:rounded-[32px] shadow-sm hover:shadow-xl transition-all group border border-transparent hover:border-indigo-100 cursor-pointer">
                     <div className="aspect-[3/4] rounded-2xl overflow-hidden mb-4 relative bg-gray-100 shadow-inner">
-                      {/* RECOMMEND STAR */}
-{role === "admin" && (
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
-      toggleRecommendation(book.id);
-    }}
-    className="absolute top-2 left-2 z-20 p-1 bg-white/80 rounded-full shadow hover:scale-110 transition"
-  >
-    <Star
-      size={18}
-      className={
-        book.recommended
-          ? "text-yellow-400 fill-yellow-400"
-          : "text-gray-400"
-      }
-    />
-  </button>
-)}
+        {/* RECOMMEND STAR */}
+                  {role === "admin" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleRecommendation(book.id);
+                      }}
+                      className="absolute top-2 left-2 z-20 p-1 bg-white/80 rounded-full shadow hover:scale-110 transition"
+                    >
+                      <Star
+                        size={18}
+                        className={
+                          book.recommended
+                            ? "text-yellow-400 fill-yellow-400"
+                            : "text-gray-400"
+                        }
+                      />
+                    </button>
+                  )}
 
                       <img src={book.cover} alt={book.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       {role === 'admin' && (
@@ -516,18 +580,18 @@ if (!isLoggedIn) {
                         </div>
                       )}
                     </div>
-                    <h3 className="font-bold text-lg leading-tight truncate">{book.title}</h3>
-                    <p className="text-sm text-gray-400 mb-3">{book.author}</p>
+                    <h3 className="font-bold text-xs md:text-lg leading-tight truncate">{book.title}</h3>
+                    <p className="text-[10px] md:text-sm text-gray-400 mb-2">{book.author}</p>
                     {book.borrowerId && (
   <p className="text-xs text-indigo-500 font-medium">
     Dipinjam oleh: {users.find(u => u.id === book.borrowerId)?.name}
   </p>
 )}
                     <div className="flex justify-between items-center border-t pt-3 border-gray-50 mt-auto">
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${book.status === 'Tersedia' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
+                        <span className={`text-[8px] md:text-[10px] font-bold px-2 py-1 rounded-lg ${book.status === 'Tersedia' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'}`}>
                           {book.status}
                         </span>
-                        <span className="text-xs font-black text-indigo-600">Rp {book.price.toLocaleString()}</span>
+                        <span className="text-[10px] md:text-xs font-black text-indigo-600">Rp {book.price.toLocaleString()}</span>
                     </div>
                   </div>
                 ))}
@@ -537,7 +601,7 @@ if (!isLoggedIn) {
 
           {/* TAB: INFO */}
           {activeTab === 'info' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-8 animate-in fade-in duration-500">
               <div className="lg:col-span-2 space-y-6">
                 <div className="bg-white p-4 rounded-[40px] shadow-sm relative group overflow-hidden">
                   <img src={infoPoster} className="w-full h-[500px] object-cover rounded-[32px] transition-transform duration-700 group-hover:scale-105" alt="Poster" />
@@ -623,7 +687,7 @@ if (!isLoggedIn) {
 {activeTab === "bookshelf" && (
   <div className="space-y-10">
 
-    <h2 className="text-2xl font-serif font-bold">
+    <h2 className="text-lg md:text-2xl font-serif font-bold">
       Rak Buku Berdasarkan Kategori
     </h2>
 
@@ -635,7 +699,7 @@ if (!isLoggedIn) {
           {tag}
         </h3>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-8">
 
           {booksByTag[tag].map((book) => (
             
@@ -657,25 +721,19 @@ if (!isLoggedIn) {
               <p className="text-xs text-gray-400">
                 {book.author}
               </p>
-
             </div>
-
           ))}
-
         </div>
-
       </div>
-
     ))}
-
   </div>
 )}
 
           {/* TAB: LIBRARY */}
           {activeTab === 'library' && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-serif font-bold">Sedang Tren di Suryakanta</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <h2 className="text-lg md:text-2xl font-serif font-bold">Sedang Tren di Suryakanta</h2>
+             <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-8">
                 {books.filter(b => b.status === "Dipinjam").length > 0 ? (
                   books.filter(b => b.status === "Dipinjam").map(book => (
                     <div key={book.id} onClick={() => setSelectedBook(book)} className="bg-white p-6 rounded-[32px] flex gap-6 shadow-sm border border-orange-100 cursor-pointer hover:shadow-md transition-all">
@@ -705,11 +763,11 @@ if (!isLoggedIn) {
           {/* TAB: RECOMMENDATIONS */}
 {activeTab === "history" && (
   <div className="space-y-6">
-    <h2 className="text-2xl font-serif font-bold">
+    <h2 className="text-lg md:text-2xl font-serif font-bold">
       Buku Rekomendasi Suryakanta
     </h2>
 
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-8">
 
       {books.filter((b) => b.recommended).length > 0 ? (
         books
@@ -755,7 +813,30 @@ if (!isLoggedIn) {
                 <tbody className="divide-y divide-gray-50">
                   {members.map(m => (
                     <tr key={m.id} className="hover:bg-gray-50/30 transition-all">
-                      <td className="p-6"><p className="font-bold">{m.name}</p><p className="text-xs text-gray-400">#{m.id}</p></td>
+                      <td className="p-6">
+                        <td className="p-6 flex items-center gap-3">
+
+                      <img
+                      src={m.photo || `https://ui-avatars.com/api/?name=${m.name}`}
+                      className="w-10 h-10 rounded-xl object-cover"
+                      />
+
+                      <div>
+                      <p
+                      className="font-bold cursor-pointer text-indigo-600"
+                      onClick={()=>setSelectedMemberProfile(m)}
+                      >
+                      {m.name}
+                      </p>
+
+                      <p className="text-xs text-gray-400">
+                      #{m.id}
+                      </p>
+                      </div>
+
+
+                      </td>
+                    <p className="text-xs text-gray-400">#{m.id}</p></td>
                       <td className="p-6"><p className="text-sm">{m.email}</p><p className="text-sm text-green-600 font-medium">{m.whatsapp}</p></td>
                       <td className="p-6">
                         <div className="flex flex-col gap-1">
@@ -804,31 +885,163 @@ if (!isLoggedIn) {
 
           {/* TAB: PROFILE */}
           {activeTab === 'profile' && (
-            <div className="max-w-md mx-auto bg-white rounded-[50px] p-10 shadow-sm border border-gray-50">
-              <div className="flex flex-col items-center">
-                <div className="relative group">
-                  <img src={profile.photo} className="w-40 h-40 rounded-[48px] object-cover shadow-2xl border-8 border-white" alt="Profile" />
-                  <label className="absolute bottom-2 right-2 p-3 bg-indigo-600 text-white rounded-2xl shadow-lg cursor-pointer">
-                    <Camera size={20}/>
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, (url) => setProfile({...profile, photo: url}))} />
-                  </label>
-                </div>
-                <div className="mt-10 w-full space-y-6">
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Username</label>
-                    <input className="w-full bg-gray-50 p-4 rounded-2xl border-none outline-none font-bold" value={profile.name} onChange={(e) => setProfile({...profile, name: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">WhatsApp</label>
-                    <input className="w-full bg-gray-50 p-4 rounded-2xl border-none outline-none font-bold" value={profile.whatsapp} onChange={(e) => setProfile({...profile, whatsapp: e.target.value})} />
-                  </div>
-                  <button className="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-indigo-100">
-                    <Save size={18}/> Simpan Profil
-                  </button>
-                </div>
-              </div>
+          <div className="mt-10 w-full space-y-6">
+
+            <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+              {/* FOTO PROFIL */}
+            <div className="flex justify-center mb-6">
+
+            <label className="cursor-pointer relative group">
+
+            <div className="w-32 h-32 rounded-3xl overflow-hidden shadow-lg bg-gray-100">
+
+            <img
+            src={profile.photo}
+            className="w-full h-full object-cover"
+            />
+
             </div>
+
+            <input
+            type="file"
+            accept="image/*"
+            onChange={handleProfilePhoto}
+            className="hidden"
+            />
+
+            </label>
+
+            </div>
+            Nama
+            </label>
+            <input
+            className="w-full bg-gray-50 p-4 rounded-2xl"
+            value={profile.name}
+            readOnly
+            />
+            </div>
+
+            <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+            Email
+            </label>
+            <input
+            className="w-full bg-gray-50 p-4 rounded-2xl"
+            value={profile.email}
+            readOnly
+            />
+            </div>
+
+            <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+            WhatsApp
+            </label>
+            <input
+            className="w-full bg-gray-50 p-4 rounded-2xl"
+            value={profile.whatsapp}
+            readOnly
+            />
+            </div>
+
+            <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+            Alamat
+            </label>
+            <input
+            className="w-full bg-gray-50 p-4 rounded-2xl"
+            value={profile.address || ""}
+            onChange={(e)=>setProfile({...profile,address:e.target.value})}
+            />
+            </div>
+
+            <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+            Tempat Lahir
+            </label>
+            <input
+            className="w-full bg-gray-50 p-4 rounded-2xl"
+            value={profile.birthPlace || ""}
+            onChange={(e)=>setProfile({...profile,birthPlace:e.target.value})}
+            />
+            </div>
+
+            <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+            Tanggal Lahir
+            </label>
+            <input
+            type="date"
+            className="w-full bg-gray-50 p-4 rounded-2xl"
+            value={profile.birthDate || ""}
+            onChange={(e)=>setProfile({...profile,birthDate:e.target.value})}
+            />
+            </div>
+
+            <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+            Hobi
+            </label>
+            <input
+            className="w-full bg-gray-50 p-4 rounded-2xl"
+            value={profile.hobby || ""}
+            onChange={(e)=>setProfile({...profile,hobby:e.target.value})}
+            />
+            </div>
+
+            <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">
+            Motivasi
+            </label>
+            <textarea
+            className="w-full bg-gray-50 p-4 rounded-2xl"
+            value={profile.motivation || ""}
+            onChange={(e)=>setProfile({...profile,motivation:e.target.value})}
+            />
+            </div>
+            <button
+            onClick={saveProfile}
+            className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-700 transition"
+            >
+            Simpan Profil
+            </button>
+          </div>
           )}
+
+          {selectedMemberProfile && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[120]">
+
+            <div className="bg-white p-10 rounded-[40px] w-[500px]">
+
+            <h2 className="text-lg md:text-2xl font-serif font-bold">
+            Profil Member
+            </h2>
+
+            <p><b>Nama:</b> {selectedMemberProfile.name}</p>
+            <p><b>Email:</b> {selectedMemberProfile.email}</p>
+            <p><b>WhatsApp:</b> {selectedMemberProfile.whatsapp}</p>
+            <p><b>Alamat:</b> {selectedMemberProfile.address || "-"}</p>
+            <p><b>Tempat Lahir:</b> {selectedMemberProfile.birthPlace || "-"}</p>
+            <p><b>Tanggal Lahir:</b> {selectedMemberProfile.birthDate || "-"}</p>
+            <p><b>Hobi:</b> {selectedMemberProfile.hobby || "-"}</p>
+            <p><b>Motivasi:</b> {selectedMemberProfile.motivation || "-"}</p>
+
+            <button
+            onClick={()=>setSelectedMemberProfile(null)}
+            className="mt-6 bg-indigo-600 text-white px-6 py-2 rounded-xl"
+            >
+            Tutup
+            </button>
+
+            </div>
+            <button
+            onClick={saveProfile}
+            className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-indigo-700 transition"
+            >
+            Simpan Profil
+            </button>
+            </div>
+            )}
 
           {/* MODAL DETAIL BUKU */}
           {selectedBook && (
@@ -919,7 +1132,6 @@ if (!isLoggedIn) {
   <label className="relative cursor-pointer group">
 
     <div className="w-40 h-56 bg-gray-100 rounded-2xl shadow-lg flex items-center justify-center overflow-hidden">
-
       {(coverPreview || formData.cover) ? (
         <img
           src={coverPreview || formData.cover}
@@ -928,7 +1140,6 @@ if (!isLoggedIn) {
       ) : (
         <Plus size={40} className="text-gray-400" />
       )}
-
     </div>
 
     <input
@@ -938,9 +1149,7 @@ if (!isLoggedIn) {
       className="hidden"
       required={!isEditing}
     />
-
   </label>
-
 </div>
 
         <input
@@ -1016,11 +1225,7 @@ if (!isLoggedIn) {
         <div className="col-span-2 flex justify-center mb-4">
 
   <label className="relative cursor-pointer group">
-
-    
-
   </label>
-
 </div>
 
         <textarea
